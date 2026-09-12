@@ -79,9 +79,34 @@
   $('#reset').onclick=()=>{finish();commit({type:'reset'});$('#status').textContent='A fresh picture! Undo brings your colors back.';};
   $('#previous').onclick = () => show(Math.max(0, page - 1)); $('#next').onclick = () => show(Math.min(pages.length - 1, page + 1));
   const point = event => { const r = canvas.getBoundingClientRect(); return [(event.clientX - r.left) * canvas.width / r.width, (event.clientY - r.top) * canvas.height / r.height]; };
-  canvas.addEventListener('pointerdown', event => { if(active || event.button !== 0) return; event.preventDefault(); if(mode==='fill'){const seed=point(event);if(region(...seed))commit({type:'fill',color,seed});return;} canvas.setPointerCapture(event.pointerId); pointer = event.pointerId; active = {color, size, erase: erasing, points: [point(event)]}; render(); });
+  const touches = new Set();
+  let pendingFill = null, pinching = false;
+  function cancelPaint() { active = null; pendingFill = null; pointer = null; render(); }
+  // Track both fingers, including one that lands outside the canvas.
+  window.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'touch') return;
+    touches.add(event.pointerId);
+    if (touches.size > 1) { pinching = true; cancelPaint(); }
+  }, true);
+  canvas.addEventListener('pointerdown', event => {
+    if (pinching || pointer !== null || event.button !== 0) return;
+    canvas.setPointerCapture(event.pointerId); pointer = event.pointerId;
+    // Wait for release before filling so a pinch cannot accidentally fill a shape.
+    if (mode === 'fill') { pendingFill = {type:'fill', color, seed:point(event)}; return; }
+    active = {color, size, erase: erasing, points: [point(event)]}; render();
+  });
   canvas.addEventListener('pointermove', event => { if(!active || event.pointerId !== pointer) return; active.points.push(point(event)); render(); });
-  canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish); canvas.addEventListener('lostpointercapture', finish);
+  canvas.addEventListener('pointerup', event => {
+    if (event.pointerId !== pointer) return;
+    if (pendingFill) { const action = pendingFill; pendingFill = null; pointer = null; if(region(...action.seed)) commit(action); }
+    else finish();
+  });
+  canvas.addEventListener('pointercancel', event => { if(event.pointerId === pointer) cancelPaint(); });
+  canvas.addEventListener('lostpointercapture', event => { if(event.pointerId === pointer) cancelPaint(); });
+  for (const type of ['pointerup', 'pointercancel']) window.addEventListener(type, event => {
+    touches.delete(event.pointerId);
+    if (!touches.size) pinching = false;
+  });
   window.addEventListener('pagehide', finish);
   show(0);
 })();
