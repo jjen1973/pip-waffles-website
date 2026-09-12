@@ -3,6 +3,16 @@
   const pages = JSON.parse(document.querySelector('#edition').textContent).pages;
   const $ = selector => document.querySelector(selector);
   const canvas = $('#paint'), ctx = canvas.getContext('2d');
+  const movePage = $('#move-page');
+  movePage.onclick = () => {
+    const moving = movePage.getAttribute('aria-pressed') !== 'true';
+    movePage.setAttribute('aria-pressed', moving);
+    canvas.style.pointerEvents = moving ? 'none' : '';
+    movePage.textContent = moving ? 'Back to coloring' : 'Move page';
+  };
+  document.querySelectorAll('#brush, #fill, #eraser').forEach(button => button.addEventListener('click', () => {
+    if (movePage.getAttribute('aria-pressed') === 'true') movePage.click();
+  }));
   const key = 'waffles-pip-paint-table-v1';
   const palette = [['Berry red','#e75b63'],['Carrot orange','#ef9748'],['Sunshine yellow','#f6d75c'],['Leaf green','#83b567'],['Sky blue','#58a9da'],['Deep blue','#537abb'],['Lilac purple','#a285c9'],['Blossom pink','#edacc0'],['Earth brown','#a57854'],['Warm sand','#dec7a0'],['Soft gray','#a6a9ab'],['Midnight','#424654']];
   let page = 0, color = palette[4][1], size = 36, erasing = false, active = null, pointer = null, drawings = {};
